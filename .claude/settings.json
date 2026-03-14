@@ -1,0 +1,23 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/scripts/check-authority-consumers.py\"",
+            "timeout": 10,
+            "statusMessage": "Checking SSOA consumers..."
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/scripts/audit-docs-hook.sh\"",
+            "timeout": 10,
+            "statusMessage": "Auditing doc references..."
+          }
+        ]
+      }
+    ]
+  }
+}

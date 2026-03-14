@@ -1,0 +1,181 @@
+{
+  "query": "GetProducts",
+  "behavior": "取得所有 Products 列表",
+  "input": [],
+  "method": "productDtoProjection.queryAll",
+  "output": "GetProductsOutput",
+  "domainModelNotes": [
+    "此為查詢操作，不會修改任何 domain 狀態",
+    "應回傳所有存在的 Products"
+  ],
+  "dependencies": [
+    { 
+      "name": "productDtoProjection", 
+      "type": "ProductDtoProjection", 
+      "note": "使用它查詢資料庫並回傳所有 Products" 
+    }
+  ],
+  "projections": [
+    {
+      "name": "ProductDtoProjection extends Projection<Void, List<ProductDto>>",
+      "description": "查詢資料庫取得所有 Products 並回傳 List<ProductDto>",
+      "input": [],
+      "note": "需要新增 queryAll() 方法到現有的 ProductDtoProjection"
+    }
+  ],
+  "dataTransferObjects": [
+    {
+      "name": "ProductDto",
+      "description": "Product 資料傳輸物件",
+      "fields": [
+        { "name": "id", "type": "String" },
+        { "name": "name", "type": "String" },
+        { "name": "goal", "type": "String" },
+        { "name": "definitionOfDone", "type": "DefinitionOfDoneDto" },
+        { "name": "note", "type": "String" },
+        { "name": "extension", "type": "String" },
+        { "name": "state", "type": "String" }
+      ],
+      "note": "重用現有的 ProductDto"
+    },
+    {
+      "name": "DefinitionOfDoneDto",
+      "description": "DoD DTO",
+      "fields": [
+        { "name": "name", "type": "String" },
+        { "name": "criteria", "type": "List<String>" },
+        { "name": "note", "type": "String" },
+        { "name": "definedAt", "type": "Instant" }
+      ],
+      "note": "重用現有的 DefinitionOfDoneDto"
+    }
+  ],
+  "mappers": [
+    {
+      "name": "ProductMapper",
+      "description": "Map Product entity to ProductDto",
+      "location": "product.usecase.port",
+      "critical": true,
+      "methods": [
+        "toDto(Product product) -> ProductDto",
+        "toDtoList(List<Product> products) -> List<ProductDto>"
+      ],
+      "note": "使用現有的 ProductMapper，可能需要新增 toDtoList 方法"
+    },
+    {
+      "name": "DefinitionOfDoneMapper",
+      "description": "Map DefinitionOfDone entity to DefinitionOfDoneDto",
+      "location": "product.usecase.port",
+      "critical": true,
+      "methods": [
+        "toDto(DefinitionOfDone dod) -> DefinitionOfDoneDto"
+      ],
+      "note": "使用現有的 DefinitionOfDoneMapper"
+    }
+  ],
+  "testDataSetup": {
+    "description": "準備多個 Products 測試資料",
+    "steps": [
+      {
+        "order": 1,
+        "useCase": "CreateProductUseCase",
+        "description": "創建第一個 Product",
+        "input": {
+          "id": "product-1",
+          "name": "AI Scrum Assistant",
+          "userId": "user-456"
+        }
+      },
+      {
+        "order": 2,
+        "useCase": "SetProductGoalUseCase",
+        "description": "設定第一個 Product 的 Goal",
+        "input": {
+          "productId": "product-1",
+          "productGoalId": "goal-1",
+          "name": "Deliver AI-powered Scrum tools",
+          "description": "Build comprehensive AI assistant for Scrum teams",
+          "state": "ACTIVE"
+        }
+      },
+      {
+        "order": 3,
+        "useCase": "DefineDefinitionOfDoneUseCase",
+        "description": "定義第一個 Product 的 DoD",
+        "input": {
+          "productId": "product-1",
+          "name": "Standard DoD",
+          "criteria": ["Code reviewed", "Unit tests passing", "Documentation updated"],
+          "note": "Team agreed definition",
+          "definedAt": "Instant.now()"
+        }
+      },
+      {
+        "order": 4,
+        "useCase": "CreateProductUseCase",
+        "description": "創建第二個 Product",
+        "input": {
+          "id": "product-2",
+          "name": "Mobile Banking App",
+          "userId": "user-789"
+        }
+      },
+      {
+        "order": 5,
+        "useCase": "SetProductGoalUseCase",
+        "description": "設定第二個 Product 的 Goal",
+        "input": {
+          "productId": "product-2",
+          "productGoalId": "goal-2",
+          "name": "Modernize mobile banking experience",
+          "description": "Create user-friendly mobile banking platform",
+          "state": "ACTIVE"
+        }
+      },
+      {
+        "order": 6,
+        "useCase": "CreateProductUseCase",
+        "description": "創建第三個 Product（沒有 Goal 和 DoD）",
+        "input": {
+          "id": "product-3",
+          "name": "E-commerce Platform",
+          "userId": "user-111"
+        }
+      }
+    ],
+    "note": "在 Given 階段執行這些步驟後，記得清除 setup 產生的 events"
+  },
+  "testScenarios": [
+    {
+      "name": "should_get_all_products_successfully",
+      "given": "多個 Products 已建立（有些包含 Goal 和 DoD，有些沒有）",
+      "when": "呼叫 GetProductsUseCase",
+      "then": [
+        "應該成功回傳 List<ProductDto>",
+        "List 應包含所有 3 個 Products",
+        "第一個 Product 應包含完整的 Goal 和 DoD 資訊",
+        "第二個 Product 應包含 Goal 但沒有 DoD",
+        "第三個 Product 既沒有 Goal 也沒有 DoD",
+        "每個 ProductDto 應包含正確的基本資料（id, name, state）"
+      ]
+    },
+    {
+      "name": "should_return_empty_list_when_no_products",
+      "given": "資料庫中沒有任何 Product",
+      "when": "呼叫 GetProductsUseCase",
+      "then": [
+        "應該成功回傳空的 List<ProductDto>",
+        "ExitCode 應為 SUCCESS"
+      ]
+    },
+    {
+      "name": "should_return_single_product_when_only_one_exists",
+      "given": "只有一個 Product 存在",
+      "when": "呼叫 GetProductsUseCase",
+      "then": [
+        "應該成功回傳包含單一 ProductDto 的 List",
+        "該 ProductDto 應包含正確的資料"
+      ]
+    }
+  ]
+}

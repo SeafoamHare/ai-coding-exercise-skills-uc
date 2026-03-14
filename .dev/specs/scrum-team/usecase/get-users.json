@@ -1,0 +1,37 @@
+{
+  "query": "GetUsers",
+  "behavior": "回傳 List<UserDto>",
+  "input": [],
+  "method": "getUsersProjection.queryAll",
+  "output": "GetUsersOutput",
+  "domainModelNotes": [
+    "沒有 User Aggregate, UserDto 直接從資料庫找出資料"
+  ],
+  "dependencies": [
+    {
+      "name": "getUsersProjection",
+      "type": "GetUsersProjection",
+      "note": "使用它查詢資料庫並回傳結果"
+    }
+  ],
+  "projections": [
+    {
+      "name": "GetUsersProjection extends Projection<Void, List<UserDto>>",
+      "description": "查詢資料庫取得所有 User 並回傳 List<UserDto>",
+      "input": [],
+      "note": "沒有 User Aggregate, UserDto 直接從資料庫找出資料"
+    }
+  ],
+  "dataTransferObjects": [
+    {
+      "name": "UserDto",
+      "description": "User 資料傳輸物件",
+      "fields": [
+        { "name": "id", "type": "String" },
+        { "name": "name", "type": "String" },
+        { "name": "email", "type": "String" }
+      ],
+      "note": "沒有 User Aggregate, UserDto 直接從資料庫找出資料"
+    }
+  ]
+}

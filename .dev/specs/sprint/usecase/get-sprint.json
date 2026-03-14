@@ -1,0 +1,208 @@
+{
+  "query": "GetSprint",
+  "behavior": "依據 SprintId 回傳 SprintDto",
+  "input": [
+    { "name": "sprintId", "type": "String", "note": "Sprint 的唯一識別碼" }
+  ],
+  "method": "sprintDtoProjection.query",
+  "output": "GetSprintOutput",
+  "domainModelNotes": [
+  ],
+  "dependencies":
+  [
+    { "name": "sprintDtoProjection", "type": "SprintDtoProjection", "note": "使用它查詢資料庫並回傳結果" }
+  ],
+  "projections": [
+    {
+      "name": "SprintDtoProjection extends Projection<SprintDtoProjectionInput, Optional<SprintDto>>",
+      "description": "使用它到資料庫依據 sprintId 找到 Sprint 並回傳 Optional<SprintDto> 給使用者",
+      "input": [
+        { "name": "sprintId", "type": "String" }
+      ]
+    }
+  ],
+  "dataTransferObjects": [
+    {
+      "name": "SprintDto",
+      "description": "Sprint DTO",
+      "fields": [
+        { "name": "id", "type": "String" },
+        { "name": "productId", "type": "String" },
+        { "name": "name", "type": "String" },
+        { "name": "goal", "type": "SprintGoalDto" },
+        { "name": "timebox", "type": "TimeboxDto" },
+        { "name": "state", "type": "String" },
+        { "name": "capacity", "type": "CapacityHoursDto" },
+        { "name": "dailyScrum", "type": "SprintMeetingDto" },
+        { "name": "review", "type": "SprintMeetingDto" },
+        { "name": "retrospective", "type": "SprintMeetingDto" },
+        { "name": "note", "type": "String" },
+        { "name": "extension", "type": "String" },
+        { "name": "sprintBoardConfig", "type": "SprintBoardConfigDto" }
+      ]
+    },
+    {
+      "name": "SprintGoalDto",
+      "description": "Sprint Goal DTO",
+      "fields": [
+        { "name": "value", "type": "String" }
+      ]
+    },
+    {
+      "name": "TimeboxDto",
+      "description": "Sprint Timebox DTO",
+      "fields": [
+        { "name": "start", "type": "LocalDateTime" },
+        { "name": "end", "type": "LocalDateTime" },
+        { "name": "zoneId", "type": "String" }
+      ]
+    },
+    {
+      "name": "CapacityHoursDto",
+      "description": "Sprint Capacity DTO",
+      "fields": [
+        { "name": "value", "type": "Integer" }
+      ]
+    },
+    {
+      "name": "SprintMeetingDto",
+      "description": "Sprint Meeting DTO",
+      "fields": [
+        { "name": "scheduledAt", "type": "Instant" },
+        { "name": "venue", "type": "String" },
+        { "name": "duration", "type": "Duration" }
+      ]
+    },
+    {
+      "name": "SprintBoardConfigDto",
+      "description": "Sprint Board Configuration DTO",
+      "fields": [
+        { "name": "enableTest", "type": "boolean" },
+        { "name": "enableReview", "type": "boolean" }
+      ]
+    }
+  ],
+  "mappers": [
+    {
+      "name": "SprintMapper",
+      "description": "Map Sprint entity to SprintDto",
+      "location": "sprint.usecase.port",
+      "critical": true,
+      "methods": [
+        "toDto(Sprint sprint) -> SprintDto"
+      ],
+      "note": "🚨 CRITICAL: 必須產生此 Mapper，放在 usecase.port 套件"
+    },
+    {
+      "name": "SprintGoalMapper",
+      "description": "Map SprintGoal value object to SprintGoalDto",
+      "location": "sprint.usecase.port",
+      "critical": true,
+      "methods": [
+        "toDto(SprintGoal goal) -> SprintGoalDto",
+        "toDomain(SprintGoalDto dto) -> SprintGoal"
+      ],
+      "note": "🚨 CRITICAL: 每個 DTO 都要有獨立的 Mapper，不可合併在其他 Mapper 中"
+    },
+    {
+      "name": "TimeboxMapper",
+      "description": "Map Timebox value object to TimeboxDto",
+      "location": "sprint.usecase.port",
+      "critical": true,
+      "methods": [
+        "toDto(Timebox timebox) -> TimeboxDto",
+        "toDomain(TimeboxDto dto) -> Timebox"
+      ],
+      "note": "🚨 CRITICAL: 每個 DTO 都要有獨立的 Mapper，不可合併在其他 Mapper 中"
+    },
+    {
+      "name": "CapacityHoursMapper",
+      "description": "Map CapacityHours value object to CapacityHoursDto",
+      "location": "sprint.usecase.port",
+      "critical": true,
+      "methods": [
+        "toDto(CapacityHours capacity) -> CapacityHoursDto",
+        "toDomain(CapacityHoursDto dto) -> CapacityHours"
+      ],
+      "note": "🚨 CRITICAL: 每個 DTO 都要有獨立的 Mapper，不可合併在其他 Mapper 中"
+    },
+    {
+      "name": "SprintBoardConfigMapper",
+      "description": "Map SprintBoardConfig value object to SprintBoardConfigDto",
+      "location": "sprint.usecase.port",
+      "critical": true,
+      "methods": [
+        "toDto(SprintBoardConfig config) -> SprintBoardConfigDto",
+        "toDomain(SprintBoardConfigDto dto) -> SprintBoardConfig"
+      ],
+      "note": "🚨 CRITICAL: 每個 DTO 都要有獨立的 Mapper，不可合併在其他 Mapper 中"
+    }
+  ],
+  "testDataSetup": {
+    "description": "準備完整的 Sprint 測試資料，包含 SprintGoal 和 Timebox",
+    "steps": [
+      {
+        "order": 1,
+        "useCase": "CreateSprintUseCase",
+        "description": "創建基本的 Sprint",
+        "input": {
+          "productId": "product-123",
+          "sprintId": "sprint-456",
+          "name": "Sprint 1",
+          "goal": "Complete user authentication module",
+          "startDateTime": "LocalDateTime.of(2025, 1, 1, 9, 0)",
+          "endDateTime": "LocalDateTime.of(2025, 1, 14, 17, 0)",
+          "zoneId": "Asia/Taipei",
+          "state": "PLANNED",
+          "capacity": "160",
+          "creatorId": "user-789"
+        }
+      },
+      {
+        "order": 2,
+        "useCase": "DefineSprintGoalUseCase",
+        "description": "定義 Sprint Goal",
+        "input": {
+          "sprintId": "sprint-456",
+          "goal": "Deliver complete authentication with OAuth integration"
+        }
+      },
+      {
+        "order": 3,
+        "useCase": "SetSprintTimeboxUseCase",
+        "description": "設定 Sprint Timebox",
+        "input": {
+          "sprintId": "sprint-456",
+          "startDateTime": "LocalDateTime.of(2025, 1, 1, 9, 0)",
+          "endDateTime": "LocalDateTime.of(2025, 1, 14, 17, 0)",
+          "zoneId": "Asia/Taipei"
+        }
+      }
+    ],
+    "note": "在 Given 階段執行這些步驟後，記得清除 setup 產生的 events"
+  },
+  "testScenarios": [
+    {
+      "name": "should_get_sprint_successfully",
+      "given": "完整的 Sprint 資料已建立（包含 Goal 和 Timebox）",
+      "when": "呼叫 GetSprintUseCase 查詢該 Sprint",
+      "then": [
+        "應該成功回傳 SprintDto",
+        "SprintDto 應包含正確的基本資料（id, productId, name, state）",
+        "SprintDto.goal 應包含 SprintGoal 的資訊",
+        "SprintDto.timebox 應包含完整的時間區間資料",
+        "SprintDto.capacity 應包含正確的工時容量",
+        "SprintDto.sprintBoardConfig 應包含正確的看板設定（enableTest, enableReview）"
+      ]
+    },
+    {
+      "name": "should_return_failure_when_sprint_not_found",
+      "given": "不存在任何 Sprint",
+      "when": "查詢不存在的 sprintId",
+      "then": [
+        "應該回傳 ExitCode.FAILURE",
+        "應該包含適當的錯誤訊息"
+      ]
+    }
+  ]
+}

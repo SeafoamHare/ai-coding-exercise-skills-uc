@@ -1,0 +1,140 @@
+{
+  "query": "GetProduct",
+  "behavior": "依據 ProductId 回傳 ProductDto",
+  "input": [
+    { "name": "productId", "type": "String", "note": "Product 的唯一識別碼" }
+  ],
+  "method": "productDtoProjection.query",
+  "output": "GetProductOutput",
+  "domainModelNotes": [
+  ],
+  "dependencies":
+  [
+    { "name": "productDtoProjection", "type": "ProductDtoProjection", "note": "使用它查詢資料庫並回傳結果" }
+  ],
+  "projections": [
+    {
+      "name": "ProductDtoProjection extends Projection<ProductDtoProjectionInput, Optional<ProductDto>>",
+      "description": "使用它到資料庫依據 productId 找到 Product 並回傳 Optional<ProductDto> 給使用者",
+      "input": [
+        { "name": "productId", "type": "String" }
+      ]
+    }
+  ],
+  "dataTransferObjects": [
+    {
+      "name": "ProductDto",
+      "description": "DTO",
+      "fields": [
+        { "name": "id", "type": "String" },
+        { "name": "name", "type": "String" },
+        { "name": "goal", "type": "String" },
+        { "name": "definitionOfDone", "type": "DefinitionOfDoneDto" },
+        { "name": "note", "type": "String" },
+        { "name": "extension", "type": "String" },
+        { "name": "state", "type": "String" }
+      ]
+    },
+    {
+      "name": "DefinitionOfDoneDto",
+      "description": "DoD DTO",
+      "fields": [
+        { "name": "name", "type": "String" },
+        { "name": "criteria", "type": "List<String>" },
+        { "name": "note", "type": "String" },
+        { "name": "definedAt", "type": "Instant" }
+      ]
+    }
+  ],
+  "mappers": [
+    {
+      "name": "ProductMapper",
+      "description": "Map Product entity to ProductDto",
+      "location": "product.usecase.port",
+      "critical": true,
+      "methods": [
+        "toDto(Product product) -> ProductDto"
+      ],
+      "note": "🚨 CRITICAL: 必須產生此 Mapper，放在 usecase.port 套件"
+    },
+    {
+      "name": "DefinitionOfDoneMapper",
+      "description": "Map DefinitionOfDone entity to DefinitionOfDoneDto",
+      "location": "product.usecase.port",
+      "critical": true,
+      "methods": [
+        "toDto(DefinitionOfDone dod) -> DefinitionOfDoneDto",
+        "toDomain(DefinitionOfDoneDto dto) -> DefinitionOfDone"
+      ],
+      "note": "🚨 CRITICAL: 每個 DTO 都要有獨立的 Mapper，不可合併在其他 Mapper 中"
+    }
+  ],
+  "testDataSetup": {
+    "description": "準備完整的 Product 測試資料，包含 ProductGoal 和 DefinitionOfDone",
+    "steps": [
+      {
+        "order": 1,
+        "useCase": "CreateProductUseCase",
+        "description": "創建基本的 Product",
+        "input": {
+          "id": "product-123",
+          "name": "AI Scrum Assistant",
+          "userId": "user-456"
+        }
+      },
+      {
+        "order": 2,
+        "useCase": "SetProductGoalUseCase",
+        "description": "設定 Product Goal",
+        "input": {
+          "productId": "product-123",
+          "productGoalId": "goal-123",
+          "name": "Deliver AI-powered Scrum tools",
+          "description": "Build comprehensive AI assistant for Scrum teams",
+          "state": "ACTIVE"
+        }
+      },
+      {
+        "order": 3,
+        "useCase": "DefineDefinitionOfDoneUseCase",
+        "description": "定義 Definition of Done",
+        "input": {
+          "productId": "product-123",
+          "name": "Standard DoD",
+          "criteria": [
+            "Code reviewed",
+            "Unit tests written and passing",
+            "Documentation updated",
+            "Deployed to staging"
+          ],
+          "note": "Team agreed definition",
+          "definedAt": "Instant.now()"
+        }
+      }
+    ],
+    "note": "在 Given 階段執行這些步驟後，記得清除 setup 產生的 events"
+  },
+  "testScenarios": [
+    {
+      "name": "should_get_product_successfully",
+      "given": "完整的 Product 資料已建立（包含 Goal 和 DoD）",
+      "when": "呼叫 GetProductUseCase 查詢該 Product",
+      "then": [
+        "應該成功回傳 ProductDto",
+        "ProductDto 應包含正確的基本資料（id, name, state）",
+        "ProductDto.goal 應包含 ProductGoal 的資訊",
+        "ProductDto.definitionOfDone 應包含完整的 DoD 資料",
+        "ProductDto.definitionOfDone.criteria 應包含所有完成標準"
+      ]
+    },
+    {
+      "name": "should_return_failure_when_product_not_found",
+      "given": "不存在任何 Product",
+      "when": "查詢不存在的 productId",
+      "then": [
+        "應該回傳 ExitCode.FAILURE",
+        "應該包含適當的錯誤訊息"
+      ]
+    }
+  ]
+}

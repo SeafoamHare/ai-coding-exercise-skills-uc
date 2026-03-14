@@ -1,0 +1,38 @@
+/.idea
+/target
+/Tomcat9.0/webapps/
+*.iml
+
+
+### sinology ###
+
+.DS_Store
+firebase-debug.log
+
+
+### jsp project ###
+/db/
+
+### clean Kansan project ###
+*.ser
+
+### Eclipse ###
+
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+~$*
+*~.nib
+local.properties
+.settings/
+.loadpath
+.recommenders
+.checkpoint/
+
+### AI Code Review ###
+.agent/
+.dev/reviews/
+review_output*.json
