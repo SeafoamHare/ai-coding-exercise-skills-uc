@@ -513,6 +513,86 @@ public Task(TaskId id, String name) {
 
 **Rationale:** Child entities cannot exist independently of their Aggregate.
 
+### Rule 11: Read-only Exposure across the Aggregate Boundary (Special Case) ⭐⭐⭐
+
+**Pattern:** Read-only Entities — Hu, Chen, Cheng, Yang, *"Supplemental Patterns for
+Domain-Driven Design,"* JISE 42(4), 2026, §2.4.1 (Special Case implementation).
+**Reference implementation:** `Examle-2/` (diff against `Examle-1/`).
+
+**Trigger (產生條件 — 每次都要套用):**
+
+> Whenever an **Aggregate Root has a query method that returns this entity, or a
+> collection of this entity**, you MUST generate a `ReadOnly{Entity}` class, and the
+> root MUST return the read-only version. If the entity is never returned across the
+> aggregate boundary, skip it (YAGNI).
+
+**顯式觸發來源（任一成立即產生 ReadOnly）：** spec 的 aggregate `queries[]` / `methods[]` 宣告了
+回傳此 entity 的 getter（如 `getGoal()` returns `ProductGoal`）、**或** 此 entity 帶有
+`semantics.exposure = readonly_exposure`。
+
+**為什麼 package-private mutator（Rule 2）不夠：** Rule 2 只能在**編譯期**擋住*跨 package*
+的呼叫者。它擋不住 (a) collection getter 外洩活的內部 list、(b) 回傳的巢狀 entity 被
+同 package 程式碼修改、(c) 沒有執行期 fail-fast。Read-only Entities 補上這三個洞。
+
+**Mechanics (Special Case):**
+
+1. Entity 必須 **non-final** 且保留 **package-private mutators**（讓 read-only 子類別能 override）。
+2. 加一個 **protected copy constructor** `protected {Entity}({Entity} source)`：shallow-copy
+   屬性，並對可變集合做 **defensive copy**。直接複製欄位，**不要呼叫 mutator**（子類別會把它們 override 成丟例外）。
+3. 產生 `ReadOnly{Entity} extends {Entity}`，依論文四種情境處理方法：
+
+   | Scenario | 方法類型 | 處理 |
+   |----------|---------|------|
+   | 1 | command（改狀態） | override 成 `throw new UnsupportedOperationException(...)` |
+   | 2 | query 回傳 immutable（VO/primitive） | 直接繼承 |
+   | 3 | query 回傳 entity | override 成回傳該 entity 的 read-only 版 |
+   | 4 | query 回傳 collection | override 成 `Collections.unmodifiable*`；元素若是 entity 也換成 read-only 版 |
+
+4. Aggregate Root getter 回傳 `source == null ? null : new ReadOnly{Entity}(source)`。
+5. **同時修掉 base getter**：真身 entity 的 collection getter 也要回傳
+   `Collections.unmodifiableList(...)`（Fowler：絕不回傳活的集合參考）。
+
+```java
+// ReadOnly{Entity} — Special Case
+public final class ReadOnlyProductGoal extends ProductGoal {
+    private static final String MSG =
+        "ProductGoal is read-only when exposed outside the Product aggregate; "
+        + "modifications must go through the Product aggregate root.";
+
+    public ReadOnlyProductGoal(ProductGoal source) { super(source); }
+
+    @Override void revise(String t, String d, java.time.Instant r) { throw new UnsupportedOperationException(MSG); }
+    @Override void addMetric(GoalMetric m)                         { throw new UnsupportedOperationException(MSG); }
+    @Override void changeState(ProductGoalState s)                 { throw new UnsupportedOperationException(MSG); }
+    // Scenarios 2 & 4 inherited unchanged from ProductGoal.
+}
+```
+
+**Base entity 的 copy constructor（讓 Special Case 能 shallow-copy）：**
+
+```java
+protected ProductGoal(ProductGoal source) {
+    Objects.requireNonNull(source, "source ProductGoal cannot be null");
+    this.id = source.id;
+    this.title = source.title;
+    this.description = source.description;
+    this.metrics = new ArrayList<>(source.metrics); // defensive copy
+    this.definedAt = source.definedAt;
+    this.revisedAt = source.revisedAt;
+    this.state = source.state;
+}
+```
+
+**Deliberate LSP trade-off:** `ReadOnly{Entity}` is-a `{Entity}` 但 command 會丟例外——
+這是論文明示、用 LSP 換 encapsulation 的**故意設計**。Code review 必須把「丟例外的 command」
+視為**預期行為**，不可當 LSP bug。
+
+**Value Object 不需要 read-only：** record / immutable VO 本來就安全，只有「裝著它們的 collection」
+需要 unmodifiable。
+
+**Proxy 替代方案：** 多型 entity 階層可改用 Proxy（抽介面、委派），見
+`references/rules/domain-patterns.md` § Read-only Entities。Special Case 為預設。
+
 ---
 
 ## VERIFICATION CHECKPOINTS
@@ -601,6 +681,26 @@ grep "apply(" ${entityFile}
 # Verify mutation methods are not public
 grep -E "public void (rename|update|change|set|mark)" ${entityFile}
 # Should return empty (mutations should be package-private)
+
+# Read-only exposure (Rule 11): if the aggregate root returns this entity, a ReadOnly variant must exist
+grep -rn "Collections.unmodifiable" ${entityFile}
+# Collection getters should return unmodifiable views (no live-reference leak)
+test -f ${entityDir}/ReadOnly${Entity}.java && \
+  grep -c "throw new UnsupportedOperationException" ${entityDir}/ReadOnly${Entity}.java
+# ReadOnly{Entity} should override every command method to throw
+```
+
+### Checkpoint 4: Read-only Exposure (Rule 11) ⭐⭐⭐
+
+```
+IF the Aggregate Root has a query method returning this entity or List<{Entity}>:
+  REQUIRE ReadOnly{Entity}.java exists
+  REQUIRE entity is non-final with a protected copy constructor
+  REQUIRE every command method is overridden in ReadOnly{Entity} to throw UnsupportedOperationException
+  REQUIRE collection getters return Collections.unmodifiable*
+  REQUIRE the root getter returns `new ReadOnly{Entity}(...)`, never the raw entity
+ELSE (entity never crosses the boundary):
+  Skip — do not generate a ReadOnly variant (YAGNI)
 ```
 
 ```

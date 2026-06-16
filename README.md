@@ -33,16 +33,14 @@ claude --dangerously-skip-permissions
 ezddd-java skill 用到哪些 patterns?
 解釋 ezddd-java skill 的 SSOA 機制
 ezddd-java skill 是否有 hook?       
-[說明](ezddd-java-skill-analysis.md)
+
 
 ## 由規格產生程式碼的 Prompt 範例
 Example 1: 使用 in-memory repository，不用起動 Postgres 
 * 在 CLAUDE CLI 中輸入以下 prompt：
 使用 execute-uc --only-inmemory 執行 create-product.json，不要參考任何 git history
 
-**已產生在：Examle-1**
 
----
 Example 2: 使用 outbox 與 in-memory repository
 * 把 project-config-outbox.json 內容複製到 project-config.json
 * 啟動 docker, 確定測試使用的 Postgres 啟動在  localhost:5800

@@ -815,6 +815,49 @@ class ClassInvariants {
 
 ---
 
+### Read-only Entity Verification (Read-only Entities pattern)
+
+When the aggregate root returns a child entity, add a `ReadOnly{Entity}ContractTest`
+in the `entity` package (so it can exercise package-private command methods the way
+the root does). Verify all four method scenarios from JISE 2026 §2.4.1.
+
+```java
+@Nested
+@DisplayName("ReadOnlyProductGoal — Read-only Entities pattern")
+class ReadOnlyExposure {
+
+    @Test
+    @DisplayName("type is preserved (still a ProductGoal)")
+    void type_preserved() {
+        assertThat(new ReadOnlyProductGoal(goalWithMetric()))
+                .isInstanceOf(ProductGoal.class);            // Ubiquitous Language force
+    }
+
+    @Test
+    @DisplayName("command methods throw UnsupportedOperationException (fail-fast)")
+    void commands_forbidden() {
+        ReadOnlyProductGoal ro = new ReadOnlyProductGoal(goalWithMetric());
+        assertThatThrownBy(() -> ro.revise("x", "y", Instant.now()))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> ro.changeState(ProductGoalState.ACTIVE))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    @DisplayName("returned collection is unmodifiable (no live-reference leak)")
+    void collection_unmodifiable() {
+        assertThatThrownBy(() -> new ReadOnlyProductGoal(goalWithMetric()).getMetrics().clear())
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+}
+```
+
+> ⚠️ The throwing command methods are **expected behavior** (a deliberate LSP trade-off),
+> not a contract violation. Do not assert `PreconditionViolationException` here —
+> read-only enforcement uses `UnsupportedOperationException`.
+
+---
+
 ## INTEGRATION WITH ORCHESTRATOR
 
 ```

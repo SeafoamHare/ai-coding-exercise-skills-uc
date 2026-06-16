@@ -9,7 +9,8 @@
 │   ├── [Aggregate]Events.java     # Domain Events (sealed interface)
 │   ├── [Aggregate]Id.java         # Aggregate ID (record)
 │   ├── [ValueObject].java         # Value Objects (records)
-│   └── [Entity].java              # Child Entities (if any)
+│   ├── [Entity].java              # Child Entities (if any)
+│   └── ReadOnly[Entity].java      # Read-only view, if the root returns [Entity] (§ Read-only Entities)
 └── ...
 ```
 
@@ -231,6 +232,48 @@ public sealed interface ProductEvents extends InternalDomainEvent {
 | `identity` | Aggregate 身分識別 | 搭配 `value_immutable`，不產生改 ID 的 use case |
 | `soft_delete_flag` | 軟刪除旗標 | 查詢/操作需尊重 isDeleted |
 | `optimistic_concurrency_version` | 樂觀鎖版本 | 版本遞增規則 |
+| `readonly_exposure` | 此 child entity 會被 aggregate root 回傳到聚合邊界外 | 產生 `ReadOnly{Entity}`；root getter 回傳 read-only 版（見下方 § Read-only Entities） |
+
+> 註：`readonly_exposure` 也可由 skill **自動推導**——只要某 child entity 被 Aggregate Root
+> 的 query 方法回傳，就視同標記。spec 顯式標記只是讓意圖更清楚。
+
+## Read-only Entities（唯讀實體）
+
+**來源：** Hu, Chen, Cheng, Yang, *"Supplemental Patterns for Domain-Driven Design:
+Read-only Entities, Internal Domain Events, and External Domain Events,"* JISE 42(4), 2026, §2。
+**模板與細節：** `references/patterns/domain/entity.md` § Rule 11、`aggregate.md` § Rule 13。
+**對照範例：** `Examle-2/`（before = `Examle-1/`）。
+
+### Problem & Forces
+
+- **Problem (§2.2):** *How do you safely return entities from an aggregate?* Evans 允許 root 暫時
+  交出內部 entity，但「不可持有並修改」只靠紀律，編譯期/執行期擋不住。
+- **Forces (§2.3):** ① Encapsulation（client 不該改回傳的 entity）② Ubiquitous Language（回傳型別要是
+  領域原型，不能退化成 DTO/PO）③ Informing misuses（試圖修改要當下 fail-fast，不可靜默）。
+  → 第 ③ 個 force 同時否決了「回傳 DTO」（違反 ②）與「回傳 deep copy」（改了不報錯，違反 ③）。
+
+### Solution — 兩種實作
+
+| | **Special Case（預設）** | **Proxy（opt-in）** |
+|---|---|---|
+| 機制 | `ReadOnlyX extends X`，override command 丟例外 | 抽 `IX` 介面，`ReadOnlyX implements IX` 持 `real` 委派 |
+| 何時用 | 一般情況；機械化、保留具體型別、改動最小 | 多型 entity 階層（一個 ReadOnly 服務多個子型別） |
+| 代價 | entity 須 non-final + protected copy ctor；每個具體 entity 各一個 ReadOnly | 須為每個 entity 抽介面、aggregate/client 改用介面型別（重構大） |
+
+### 四種 method 處理（§2.4.1）
+
+1. **command** → override 丟 `UnsupportedOperationException`。
+2. **query 回傳 immutable（VO/primitive）** → 直接繼承/委派。
+3. **query 回傳 entity** → 回傳該 entity 的 read-only 版。
+4. **query 回傳 collection** → 回傳 unmodifiable；元素是 entity 時換成 read-only 版。
+
+### Resulting Context（取捨）
+
+- **刻意違反 LSP**：`ReadOnlyX` is-a `X` 但 command 丟例外。論文明示這是用 LSP 換 encapsulation 的
+  故意設計；**code review 不可把它當 bug**。
+- **Event Sourcing nuance**：本專案 mutator 已是 package-private，跨 package client 本來就叫不到。
+  因此 read-only 的**外部可見**價值集中在：堵 collection 外洩、巢狀 entity 回傳、執行期 fail-fast。
+- **Value Object 免除**：record / immutable VO 不需 read-only，只有裝它們的 collection 要 unmodifiable。
 
 ## Contract Test Judgment Rules
 

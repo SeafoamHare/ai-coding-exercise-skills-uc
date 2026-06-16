@@ -51,6 +51,7 @@
 | 31 | `public void react(DomainEventData message)` in Reactor | Method name is `execute()` NOT `react()` — `Reactor<DomainEventData>` interface defines `execute()` |
 | 32 | `@CrossOrigin` on controllers (Gate 2.5: F-30) | Must use centralized `CorsConfig` bean — per-controller `@CrossOrigin` bypasses centralized CORS policy (see `security-patterns.md` Rule 6) |
 | 33 | `ALTER SEQUENCE message_store.messages_global_position_seq RESTART` in test cleanup | CatchUpRelay checkpoint 會超前 reset 後的 position，導致新 event 永遠被跳過。只 DELETE 資料，不 RESTART sequence (see `.dev/lessons/CATCHUP-RELAY-CHECKPOINT-VS-SEQUENCE-RESET.md`) |
+| 34 | Aggregate root 回傳活的 child entity（`return goal;`）或活的內部集合（`return metrics;`） | 外部 client 可改回傳物件、繞過 root 破壞 invariants。必須回傳 `ReadOnly{Entity}` / `Collections.unmodifiable*`（Read-only Entities pattern；entity.md Rule 11、aggregate.md Rule 13、`.dev/lessons/READONLY-ENTITY-EXPOSURE.md`） |
 
 ## ALWAYS REQUIRED
 
@@ -77,6 +78,7 @@
 | 19 | `@SelectPackages` in both TestSuites must include current aggregate package | After creating tests for a NEW aggregate, check `InMemoryTestSuite` + `OutboxTestSuite` — if aggregate package is missing from `@SelectPackages`, add it. Template: `references/templates/test-suites.md` |
 | 20 | Every command method MUST have `_xxxEventGenerated()` postcondition helper verifying all core business fields of the emitted event (see `Plan.java`) | Aggregate Root `ensure()` blocks |
 | 21 | `@Valid` on all `@RequestBody` parameters (Gate 2.5: R-15) | All Controller classes — missing `@Valid` skips DTO validation entirely (see `security-patterns.md` Rule 4) |
+| 22 | Aggregate getter 回傳 child entity / entity 集合時，必須回傳其 ReadOnly 版（Read-only Entities, JISE 2026 §2） | `ReadOnly{Entity} extends {Entity}` override command 丟例外；collection getter 回傳 `Collections.unmodifiable*`。細節：entity.md Rule 11 / aggregate.md Rule 13。對照範例：`Examle-2/` |
 
 ## IMPORT PATH QUICK REFERENCE
 

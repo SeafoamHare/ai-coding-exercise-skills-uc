@@ -74,6 +74,7 @@ attributes:
 | `identity` | 欄位為聚合身分識別，搭配 `value_immutable` | 用於 ID 欄位 |
 | `collection_reference_immutable` | 不產生替換集合的 setter，只能 add/remove | 檢查無 setXxx() |
 | `soft_delete_flag` | 所有操作前檢查 `!isDeleted` | invariant 自動加入 |
+| `readonly_exposure` | 此 entity 會被 root 回傳到聚合邊界外 | 產生 `ReadOnly{Entity}`；root getter 回傳 read-only（Step 7.5 / Rule 13） |
 
 ### Step 4: 驗證產生的程式碼
 
@@ -571,6 +572,43 @@ public class Product extends EsAggregateRoot<ProductId, ProductEvents> {
 
 ---
 
+### Rule 13: Read-only Entity Exposure (MANDATORY when returning entities) ⭐⭐⭐
+
+**Pattern:** Read-only Entities — Hu et al., JISE 42(4), 2026, §2 (Special Case default).
+**Detail / templates:** `references/patterns/domain/entity.md` § Rule 11.
+**Reference implementation:** `Examle-2/` (diff against `Examle-1/`).
+
+> **An Aggregate Root MUST NOT hand out a live internal child entity or a live internal
+> collection.** Any query method that returns a child entity, or a collection of child
+> entities, MUST return the **read-only** version.
+
+| 回傳型別 | ❌ 禁止 | ✅ 要求 |
+|---------|--------|--------|
+| 單一 child entity | `return goal;` | `return goal == null ? null : new ReadOnlyProductGoal(goal);` |
+| child entity 集合 | `return tasks;` / `return List.copyOf(tasks);`（仍是可變 Task） | `return tasks.values().stream().map(ReadOnlyTask::new).toList();`（unmodifiable + read-only 元素） |
+| value object 集合 | `return metrics;`（活 list） | `return Collections.unmodifiableList(metrics);` |
+
+```java
+// ✅ CORRECT — aggregate root returns read-only views
+public ProductGoal getGoal() {
+    return goal == null ? null : new ReadOnlyProductGoal(goal);   // type preserved, mutation blocked
+}
+
+// ❌ WRONG — leaks the live entity; client can bypass the root and break invariants
+public ProductGoal getGoal() {
+    return goal;
+}
+```
+
+**Rationale:** Evans 允許 root 暫時把內部 entity 交出去，但「client 不可持有並修改」這條
+只靠紀律。回傳 read-only 版本把它變成型別＋執行期的強制（見 entity.md Rule 11 的四種情境）。
+回傳的型別仍是原領域型別（Ubiquitous Language 不變）。
+
+> ⚠️ 不適用於：純 value object（record / immutable，本來就安全）、以及不會被回傳到聚合
+> 邊界外的 entity（YAGNI，不必產生 ReadOnly 版）。
+
+---
+
 ## VERIFICATION CHECKPOINTS
 
 ### Checkpoint 1: Input Validation
@@ -617,6 +655,11 @@ cd ${projectRoot} && mvn compile -q -pl :${module} 2>&1 | head -20
 # Verify no direct state assignment in constructor
 grep -n "this\.[a-z]* = " ${outputFile} | grep -v "when("
 # Should return empty (all assignments should be in when() methods)
+
+# Read-only exposure (Rule 13): a getter that returns a child entity must wrap it
+grep -nE "return [a-z][A-Za-z0-9]*;" ${outputFile}
+# Inspect each: if the returned field is a child entity or an entity collection,
+# it MUST be wrapped in its ReadOnly variant / an unmodifiable collection.
 ```
 
 ```
@@ -730,6 +773,29 @@ public void ${commandName}(${Params}) {
     // ensure() postconditions
 }
 ```
+
+### Step 7.5: Generate Query Getters (含 entity 的 read-only 包裝) ⭐⭐⭐
+
+為 aggregate 產生 query getter。來源有二：(a) spec 的 `queries[]` / `methods[]` 陣列（顯式宣告，
+如 `getGoal()`）；(b) 需要被外部讀取的 attribute。**對每個 getter 依回傳型別套用 Rule 13：**
+
+| getter 回傳型別 | 產生方式 |
+|----------------|---------|
+| value object / primitive | `public T getX() { return x; }` |
+| **child entity** | `public {Entity} getX() { return x == null ? null : new ReadOnly{Entity}(x); }` → **同時觸發產生 `ReadOnly{Entity}`（entity.md Rule 11）** |
+| child entity 集合 | 回傳 unmodifiable + 元素換成 `ReadOnly{Entity}`（見 Rule 13 表） |
+
+```java
+// spec: "queries": [{ "name": "getGoal()", "returns": "ProductGoal", "exposure": "readonly" }]
+public ProductGoal getGoal() {
+    return goal == null ? null : new ReadOnlyProductGoal(goal);   // Rule 13
+}
+```
+
+> ⚠️ 只要 spec 的 `queries[]` 宣告了一個回傳 child entity 的 getter，**或** entity 帶有
+> `semantics.exposure = readonly_exposure`，就**必須**：① 產生該 getter 並回傳 read-only；
+> ② 產生 `ReadOnly{Entity}` 類別；③ 在 base entity 加 protected copy constructor、collection
+> getter 改 unmodifiable。三者缺一即視為違反 Rule 13。
 
 ### Step 8: Generate Event Handlers
 

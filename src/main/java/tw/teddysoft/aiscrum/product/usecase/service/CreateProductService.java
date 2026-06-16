@@ -1,0 +1,53 @@
+package tw.teddysoft.aiscrum.product.usecase.service;
+
+import tw.teddysoft.aiscrum.product.entity.Product;
+import tw.teddysoft.aiscrum.product.entity.ProductId;
+import tw.teddysoft.aiscrum.product.entity.ProductName;
+import tw.teddysoft.aiscrum.product.usecase.port.in.CreateProductUseCase;
+import tw.teddysoft.ezddd.cqrs.usecase.CqrsOutput;
+import tw.teddysoft.ezddd.usecase.port.in.interactor.ExitCode;
+import tw.teddysoft.ezddd.usecase.port.in.interactor.UseCaseFailureException;
+import tw.teddysoft.ezddd.usecase.port.out.repository.Repository;
+
+import java.util.Objects;
+
+import static tw.teddysoft.ucontract.Contract.requireNotNull;
+
+public class CreateProductService implements CreateProductUseCase {
+
+    private final Repository<Product, ProductId> repository;
+
+    public CreateProductService(Repository<Product, ProductId> repository) {
+        this.repository = Objects.requireNonNull(repository);
+    }
+
+    @Override
+    public CqrsOutput<?> execute(CreateProductInput input) {
+        requireNotNull("Input", input);
+        requireNotNull("Product id", input.id);
+        requireNotNull("Product name", input.name);
+        requireNotNull("User id", input.userId);
+
+        try {
+            var output = CqrsOutput.create();
+            ProductId productId = ProductId.valueOf(input.id);
+
+            if (repository.findById(productId).isPresent()) {
+                output.setId(input.id)
+                        .setExitCode(ExitCode.FAILURE)
+                        .setMessage("Create product failed: product already exists, product id = " + input.id);
+                return output;
+            }
+
+            Product product = new Product(productId, ProductName.valueOf(input.name));
+            // Audit field (userId) is recorded in the domain event metadata (ADR-043, critical-rules Rule 5).
+            product.getDomainEvents().forEach(event -> event.metadata().put("userId", input.userId));
+            repository.save(product);
+
+            output.setId(input.id).setExitCode(ExitCode.SUCCESS);
+            return output;
+        } catch (Exception e) {
+            throw new UseCaseFailureException(e);
+        }
+    }
+}

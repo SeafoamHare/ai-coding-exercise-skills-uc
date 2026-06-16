@@ -50,6 +50,14 @@
         { "name": "note", "type": "String", "constraint": "default = null" },
         { "name": "extension", "type": "String", "constraint": "default = null" },
         { "name": "state", "type": "ProductLifecycleState", "constraint": "default = DRAFT"}
+      ],
+      "queries": [
+        {
+          "name": "getGoal()",
+          "returns": "ProductGoal",
+          "exposure": "readonly",
+          "description": "回傳產品目標。ProductGoal 是 child entity，會跨聚合邊界回傳給外部 client，必須回傳 read-only 版本（ReadOnlyProductGoal），不可回傳可變真身（Read-only Entities pattern；aggregate.md Rule 13 / entity.md Rule 11）。"
+        }
       ]
     }
   ],

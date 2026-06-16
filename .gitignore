@@ -40,3 +40,5 @@ review_output*.json
 ### Gate 2.5 Markers ###
 .gate25-markers/
 .claude/tmp/
+
+archive/

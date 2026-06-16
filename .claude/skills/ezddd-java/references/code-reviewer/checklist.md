@@ -7,6 +7,7 @@
 | `**/entity/{Aggregate}.java` | Aggregate Root | CRITICAL |
 | `**/entity/*Events.java` | Domain Event | CRITICAL |
 | `**/entity/*Id.java` | Value Object (ID) | HIGH |
+| `**/entity/ReadOnly*.java` | Read-only Entity | HIGH |
 | `**/entity/*.java` (class) | Entity (Internal) | MEDIUM |
 | `**/entity/*.java` (record) | Value Object | MEDIUM |
 | `**/entity/*State.java` (enum) | Enum | LOW (SKIP) |
@@ -75,6 +76,7 @@ public void start() {
 - [ ] Has soft-delete support (uses **inherited** `isDeleted` from `EsAggregateRoot`, do NOT declare own field)
 - [ ] Uses `if (ignore(...)) return;` for idempotency
 - [ ] **MUST NOT declare `version` or `isDeleted` fields** — inherited from `EsAggregateRoot` (field shadowing causes silent failures: `isDeleted()` always returns `false`, `getVersion()` always returns `0`)
+- [ ] **Read-only exposure (Rule 13)**: every getter returning a child entity / entity collection returns the `ReadOnly{Entity}` / an unmodifiable collection — NEVER the live internal object (`return goal;` / `return metrics;` is a defect)
 
 **Semantics Compliance:**
 
@@ -83,6 +85,7 @@ public void start() {
 | `value_immutable` | No setter, no mutating event, only set at creation |
 | `collection_reference_immutable` | No `setXxx(List)`, modify via behavior methods |
 | `soft_delete_flag` | Has DestructionEvent |
+| `readonly_exposure` | Returned entity wrapped in `ReadOnly{Entity}`; `ReadOnly` class exists with throwing commands |
 
 **Postcondition Check:**
 
@@ -158,6 +161,18 @@ public sealed interface ProductEvents extends InternalDomainEvent {
 - [ ] Has `equals/hashCode` based on ID
 - [ ] Only accessible through Aggregate Root
 - [ ] No direct repository access
+- [ ] Mutation methods are package-private (NOT public)
+- [ ] Collection getters return `Collections.unmodifiable*` (never a live internal list — Fowler)
+- [ ] **If the aggregate root returns this entity:** a `ReadOnly{Entity}` exists; entity is
+      non-final with a `protected` copy constructor (Read-only Entities pattern, entity.md Rule 11)
+
+### Read-only Entity (`ReadOnly*`) Checklist (CRITICAL when present)
+
+- [ ] `ReadOnly{Entity} extends {Entity}` (type preserved — Ubiquitous Language)
+- [ ] Every command method overridden to `throw new UnsupportedOperationException(...)`
+- [ ] Query methods returning entities return read-only variants; collections are unmodifiable
+- [ ] Constructor delegates to the base copy constructor (`super(source)`)
+- [ ] ⚠️ The throwing commands are a **deliberate LSP trade-off** — do NOT flag as a bug
 
 ---
 
